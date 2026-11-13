@@ -24,7 +24,12 @@ Setup takes one credential, an API key or auth token (`DECODO_AUTH_TOKEN`) from 
 disabled until it is set: open `/plugin` in `agy` (or Customizations → Installed in the app), turn
 Decodo on and paste the key. Or run `/decodo-setup` and let the agent walk you through it.
 
-To try it from a clone, run `agy plugin install .` from the repository root.
+To try it from a clone:
+
+```bash
+bash install.sh              # validates, then installs into ~/.gemini/config/plugins/; start a new agy session after
+bash install.sh --uninstall  # remove
+```
 
 ## Contributing
 

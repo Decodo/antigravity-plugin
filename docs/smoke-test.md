@@ -6,7 +6,7 @@ bottom.
 
 ## Install and enable
 
-1. `agy plugin uninstall decodo` (if present), then `agy plugin install .`.
+1. `bash install.sh` (re-run after every edit).
 2. `agy plugin list --json` shows `decodo` with 3 skills, 1 rule, 1 MCP server, `enabled: false`.
 3. Turn it on from `/plugin` (CLI) or Customizations → Installed (app). The dialog asks for
    **Decodo API key or token** and its link opens the Decodo Playground.

@@ -11,6 +11,7 @@ skills/decodo/references/         # MCP client config, raw HTTP recipes
 skills/decodo-setup/SKILL.md      # /decodo-setup (user-invoked only)
 skills/decodo-status/SKILL.md     # /decodo-status (user-invoked only)
 rules/decodo-recovery.md          # MCP auth + CLI install/auth recovery (model_decision)
+install.sh                        # local install for development (wraps agy plugin install)
 scripts/validate.mjs              # static checks for CI (agy is not available on runners)
 scripts/check-version.mjs         # version bump check, run in CI on every PR
 docs/smoke-test.md                # manual in-app test checklist
@@ -54,14 +55,34 @@ regression.
 ## Testing locally
 
 ```bash
-agy plugin install .
-agy plugin list --json              # decodo: 3 skills, 1 rule, 1 MCP server, enabled: false
-agy                                 # /plugin → Decodo → turn on, paste a key
-agy plugin uninstall decodo
+node scripts/validate.mjs           # quick static check, no agy needed
+bash install.sh                     # agy validate --strict, then install/update the plugin
+bash install.sh --uninstall         # remove
 ```
 
-`agy plugin install .` copies the folder to `~/.gemini/config/plugins/decodo/`. Re-run it after
-every edit. Then work through [`docs/smoke-test.md`](docs/smoke-test.md).
+`install.sh` copies only the shipped files to a staging folder and installs that, so `.git`,
+`scripts/` and `docs/` don't end up in `~/.gemini/config/plugins/decodo/`. Re-running it replaces
+the installed copy and keeps the plugin enabled with its token. Re-run it after every edit and
+start a new `agy` session — running sessions keep the old copy.
+
+On the first install the plugin is disabled until the token is set: start `agy`, open `/plugin`,
+turn Decodo on and paste a key. Then work through [`docs/smoke-test.md`](docs/smoke-test.md).
+
+### Headless checks
+
+`agy -p` runs one prompt without the UI, which is handy for checking what the agent actually does.
+MCP calls need an allow rule in headless mode (it can't ask for permission); pass it for that run
+only with `--settings`:
+
+```bash
+agy -p "Scrape https://example.com and tell me the main heading" \
+  --settings '{"permissions":{"allow":["mcp(decodo_decodo/*)"]}}' \
+  --output-format stream-json
+```
+
+Each `step_update` event shows a tool call: `read_file` on the skill means it triggered,
+`call_mcp_tool` with `ServerName: decodo_decodo` means the MCP lane, `run_command` with `decodo`
+means the CLI lane.
 
 **A live MCP server hides the skill.** When Decodo MCP tools are in the tool list, the agent
 calls them for scrape, search and map — the skill's CLI lane is never exercised. To test the
