@@ -1,0 +1,224 @@
+---
+trigger: model_decision
+description: Recover from any Decodo failure — a 401 or "Authentication failed" from a Decodo MCP tool, missing Decodo MCP tools, or a Decodo CLI install, PATH, or auth error. Covers both the MCP server and the decodo CLI.
+---
+
+# Decodo failure recovery
+
+Two ways to reach Decodo, two different auth stores. Use this rule when either one fails.
+
+- **A Decodo MCP tool returned an error** → **MCP auth recovery**, immediately below.
+- **The `decodo` CLI failed to install, is not on `PATH`, or exits 3** → everything from
+  **Zero-install first** onward.
+
+## MCP auth recovery
+
+Symptom, returned from a Decodo MCP tool call rather than a shell command:
+
+```
+Scraper API request failed (401): Authentication failed.
+```
+
+**The server being connected tells you nothing.** It accepts `initialize` and `tools/list` with
+any `Authorization` header — a wrong token, or the literal `Basic ${DECODO_AUTH_TOKEN}`
+placeholder — so the tools are listed and only the first real call fails. Read a 401 here as a
+missing or wrong credential, never as a Decodo outage, and never as a reason to retry the same
+call.
+
+Antigravity normally keeps this plugin disabled until `DECODO_AUTH_TOKEN` is filled in. The
+placeholder case happens when the plugin was switched on some other way (for example in
+`config.json`) without the variable.
+
+The fix is the **plugin variable**, not `decodo setup` — the CLI's config is a separate store and
+writing to it will not help. Tell the user:
+
+> Start `agy`, open `/plugin`, select Decodo, turn it on and paste your key as
+> **DECODO_AUTH_TOKEN** — or in the app, open Customizations → Installed → Decodo. Then start a
+> new session.
+
+You cannot do this for the user: `agy plugin enable decodo` refuses while the variable is unset,
+and `/plugin` is interactive. API keys come from
+<https://dashboard.decodo.com/web-data/playground> (free account = up to 10K requests, no card).
+
+**No Decodo MCP tools at all** usually means the plugin is still disabled waiting for that
+variable — the same fix applies. If the server has no `Authorization` header at all, it answers
+with an OAuth challenge that Decodo cannot complete; that also means the variable is missing.
+
+**While MCP is unauthenticated, the `decodo` CLI is the working lane** if a shell is available:
+it has its own token and covers every target. Fall back to it and say so. What you must not do is
+fall back to fetching the target site directly with `curl`, `requests`, or a headless browser —
+see the substitution ban in the `decodo` skill. A blocked page parsed as if it were real data is
+worse than reporting the failure.
+
+If a Decodo MCP tool you need is missing while others are present, it is outside the enabled
+toolsets (`web,search`). Use the CLI for that target instead — it covers all of them at no
+context cost.
+
+## Zero-install first
+
+No install is needed to try a command:
+
+```bash
+npx -y @decodo/cli whoami
+```
+
+If that works, every command in the skill works with the `npx -y @decodo/cli` prefix. Only
+install when the user wants a persistent `decodo` command.
+
+## Install
+
+```bash
+curl -fsSL https://decodo.github.io/cli/install.sh | sh   # macOS / Linux (recommended)
+irm https://decodo.github.io/cli/install.ps1 | iex        # Windows PowerShell
+npm install -g @decodo/cli                                # any platform
+```
+
+Verify:
+
+```bash
+decodo --version && decodo whoami
+```
+
+## Authentication (CLI)
+
+This section is the **CLI's** token store, which is separate from the MCP plugin variable above —
+setting one does not affect the other.
+
+The user needs a Web Data API key (or, on older plans, a basic auth token) from
+<https://dashboard.decodo.com/web-data/playground> (free account = up to 10K requests, no card).
+
+```bash
+export DECODO_AUTH_TOKEN='<token>'     # preferred: no interaction, session-scoped
+decodo setup --token '<token>'         # persist to config
+```
+
+Never run a bare `decodo setup` — it opens an interactive prompt you cannot drive.
+
+Precedence: `--token` → `DECODO_AUTH_TOKEN` → saved config.
+
+**Treat the token as a secret.** Never `cat`, read, or echo it from a config file to work
+around missing auth. If auth is missing, ask the user for a token.
+
+## Failure recovery (CLI)
+
+### `decodo: command not found` after install
+
+The npm global bin directory is not on `PATH`.
+
+1. Fall back to `npx -y @decodo/cli <command>` — this always works, prefer it over debugging.
+2. To fix properly: `npm bin -g` was removed in npm 9+; use `npm prefix -g` and add
+   `<prefix>/bin` to `PATH`.
+
+### `EACCES` / permission denied during `npm install -g`
+
+Common on company-managed machines where Node lives in `/usr/local/lib` without sudo access.
+Do **not** suggest `sudo npm install -g`. Either use the `curl` installer above, or relocate
+the npm prefix:
+
+```bash
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+export PATH=~/.npm-global/bin:$PATH   # add to ~/.zshrc or ~/.bashrc to persist
+npm install -g @decodo/cli
+```
+
+If neither works, use `npx -y @decodo/cli` and move on — it needs no install.
+
+### Exit code 3 — `No API key or auth token found.`, `Invalid credentials` or `Incorrect username or password`
+
+Exit **3** is the auth failure code. Match on the exit code, not on text: the output contains
+no "401", "unauthorized", or "auth required". The messages mean different things:
+
+- `No API key or auth token found.` — nothing is configured.
+- `Invalid credentials` — an API key *is* configured, and the API rejected it (expired, wrong,
+  or truncated).
+- `Incorrect username or password` — a basic auth token *is* configured, and the API rejected it.
+- Any exit 3 from `search`, `map` or `crawl` while `decodo whoami` shows `token:` (not
+  `api key:`) — those three commands need an API key, and a basic token is never accepted there.
+  Ask the user for an API key; `scrape` and target commands keep working with the token.
+
+```bash
+decodo whoami        # shows the CONFIGURED source + masked token — does NOT validate it
+```
+
+`whoami` makes no network call and exits **0** on a token the API would reject, so it tells you
+only whether something is set, never whether it works. Do not use it to confirm a fix. To
+validate a token, run `decodo setup --token '<token>'` — it verifies against the API and writes
+nothing on failure.
+
+Both auth errors end with the hint `Run 'decodo setup' to configure your API key or auth token`.
+**Ignore that hint** — a bare `decodo setup` opens an interactive prompt you cannot drive
+(see above). Use `decodo setup --token '<token>'` or `export DECODO_AUTH_TOKEN='<token>'`.
+
+Then, if an ask-user tool is available (such as `AskUserQuestion`), ask:
+
+**"How would you like to authenticate with Decodo?"**
+
+1. **Paste an API key or auth token (Recommended)** — from <https://dashboard.decodo.com/web-data/playground>
+2. **Set it for this session only** — export `DECODO_AUTH_TOKEN`
+
+**Ask — do not route around it.** An auth failure is fixable by the user in seconds. Never
+respond to exit 3 by fetching the target site directly (`curl`, `requests`, Playwright, a
+spoofed `User-Agent`), by switching to a different scraping provider or sibling skill, or by
+answering from memory as if it were live data. A raw fetch of an anti-bot-protected page
+returns blocked HTML or a CAPTCHA, so any value parsed out of it is silently wrong — worse
+than reporting the failure. Stop, ask, then retry the original command.
+
+For option 1 run `decodo setup --token '<token>'`; for option 2 `export DECODO_AUTH_TOKEN='<token>'`.
+Tell the user to add the export to `~/.zshrc` or `~/.bashrc` for persistence. Then retry the
+original command.
+
+### Exit code 5 (rate limited), 6 (timeout), 7 (network/server)
+
+Not install problems. Back off and retry with reduced concurrency. See the exit-code table in
+the `decodo` skill.
+
+## Version note
+
+Target `@decodo/cli` v1.0.0 or newer — v1.0.0 is the first stable release, and 0.x predates
+it. Target subcommands are generated from the API schema at runtime, so new targets appear
+without upgrading; the version matters for the command surface and flags, not the target list.
+If `decodo --version` reports 0.x, upgrade before debugging anything else:
+
+```bash
+curl -fsSL https://decodo.github.io/cli/install.sh | sh   # handles EACCES automatically
+npm install -g @decodo/cli@latest                          # only if npm -g is writable
+```
+
+### Upgrading from 0.x loses saved auth
+
+0.x stored the token in a platform preferences directory (on macOS,
+`~/Library/Preferences/decodo/config.json`). 1.0.x reads `$DECODO_CONFIG_HOME`, else
+`$XDG_CONFIG_HOME/decodo`, else `~/.config/decodo`. There is no automatic migration, so a
+freshly upgraded CLI reports `No API key or auth token found.` even though a token was configured before.
+
+A 0.x config holds `{"authToken": "..."}`, which 1.x still reads (1.x also accepts
+`{"apiKey": "..."}`), so migrate the file rather than asking the user to re-fetch a credential:
+
+```bash
+mkdir -p ~/.config/decodo
+cp ~/Library/Preferences/decodo/config.json ~/.config/decodo/config.json   # macOS
+chmod 600 ~/.config/decodo/config.json
+```
+
+Copy the file; do not read or print the token to move it. If no old config exists, fall back
+to the normal auth flow above.
+
+### Two installs shadowing each other
+
+If `decodo --version` still reports the old version after a successful upgrade, there are two
+copies on `PATH` and the earlier `PATH` entry wins. Find them and remove the stale one:
+
+```bash
+where decodo                    # or: type -a decodo
+npm uninstall -g --prefix "$HOME/.npm-global" @decodo/cli   # example: remove the old copy
+```
+
+### Simulating a fresh install (for testing)
+
+`DECODO_CONFIG_HOME` points the CLI at a different config directory. Use it to test the
+unauthenticated path without touching real credentials — safer than `decodo reset`:
+
+```bash
+DECODO_CONFIG_HOME=$(mktemp -d) decodo whoami   # behaves like a brand-new install
+```
