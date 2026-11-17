@@ -1,0 +1,31 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "decodo",
+  "displayName": "Decodo",
+  "version": "0.1.0",
+  "description": "Web scraping, SERP, and e-commerce data for AI agents. Handles JavaScript rendering, anti-bot/CAPTCHA, proxy rotation, and geo-targeting — through the Decodo CLI or the hosted Decodo MCP server.",
+  "logo": "assets/logo.svg",
+  "author": {
+    "name": "Decodo",
+    "email": "tech@decodo.com",
+    "url": "https://decodo.com"
+  },
+  "homepage": "https://decodo.com",
+  "repository": "https://github.com/Decodo/antigravity-plugin",
+  "license": "MIT",
+  "keywords": [
+    "decodo",
+    "web",
+    "scraping",
+    "serp",
+    "search",
+    "ecommerce",
+    "proxy",
+    "mcp"
+  ],
+  "suggestedPrompts": [
+    "What are the top 5 Google results for web scraping api?",
+    "Scrape decodo.com and summarise what they sell.",
+    "Get the price and rating for Amazon ASIN B09H74FXNW."
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "decodo": {
+      "serverUrl": "https://mcp.decodo.com/mcp?toolsets=web,search",
+      "headers": {
+        "Authorization": "Basic ${DECODO_AUTH_TOKEN}",
+        "x-integration": "antigravity-plugin"
+      },
+      "variables": [
+        {
+          "name": "DECODO_AUTH_TOKEN",
+          "title": "Decodo API key or token",
+          "description": "Web Data API key (or, on older plans, basic auth token). Free account = up to 10K requests, no card. This sets the MCP server only; for the Decodo CLI also run decodo setup --token with the same key. Search, map and crawl need an API key.",
+          "link": "https://dashboard.decodo.com/web-data/playground"
+        }
+      ]
+    }
+  }
+}
