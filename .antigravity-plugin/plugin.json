@@ -2,7 +2,7 @@
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "decodo",
   "displayName": "Decodo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Web scraping, SERP, and e-commerce data for AI agents. Handles JavaScript rendering, anti-bot/CAPTCHA, proxy rotation, and geo-targeting — through the Decodo CLI or the hosted Decodo MCP server.",
   "logo": "assets/logo.svg",
   "author": {
